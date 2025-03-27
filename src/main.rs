@@ -1,4 +1,7 @@
 mod app;
+mod ui;
+mod event;
+mod pokemon;
 use app::App;
 use color_eyre::Result;
 

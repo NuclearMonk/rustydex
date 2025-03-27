@@ -1,15 +1,26 @@
-use std::{ops::Index, sync::{Arc, RwLock}, time::Duration};
+use std::sync::{Arc, RwLock};
 
 use color_eyre::Result;
-use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
-    buffer::Buffer, layout::{Constraint, Layout, Rect}, style::{Style, Stylize}, text::Line, widgets::{Block, List, ListItem, Paragraph, Row, StatefulWidget, Table, TableState, Widget}, DefaultTerminal, Frame
+    buffer::Buffer, layout::{Constraint, Rect}, style::{Style, Stylize}, widgets::{Block, Row, StatefulWidget, Table, TableState, Widget}, DefaultTerminal
 };
 use rustemon::{
     error::Error,
-    model::{games::{Pokedex, PokemonEntry}, pokemon::Pokemon},
+    model::{
+        games::{Pokedex, PokemonEntry},
+        pokemon::Pokemon,
+    },
 };
-use tokio_stream::StreamExt;
+use tokio::sync::mpsc::UnboundedSender;
+
+use crate::event::{AppEvent, Event, EventHandler};
+
+
+
+
+
+
 #[derive(Debug, Default)]
 pub enum LoadingState {
     #[default]
@@ -18,63 +29,76 @@ pub enum LoadingState {
     Loaded,
     Error(String),
 }
-
 #[derive(Debug)]
 pub enum CurrentScreen {
     Pokedex(PokedexWidget),
 }
 
-impl Default for CurrentScreen {
-    fn default() -> Self {
-        CurrentScreen::Pokedex(PokedexWidget::default())
+impl CurrentScreen
+{
+    fn new(sender: UnboundedSender<Event>)-> Self
+    {
+        Self::Pokedex(PokedexWidget::new(sender))
     }
 }
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct App {
     pub should_quit: bool,
+    pub events: EventHandler,
     pub current_screen: CurrentScreen,
 }
 
+impl Default for App {
+    fn default() -> Self {
+        let events = EventHandler::new();
+        Self {
+            should_quit: Default::default(),
+            current_screen: CurrentScreen::new(events.sender.clone()),
+            events
+        }
+    }
+}
+
 impl App {
-    const FRAMES_PER_SECOND: f32 = 60.0;
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         match &self.current_screen {
             CurrentScreen::Pokedex(dex) => dex.run(),
         }
 
-        let period = Duration::from_secs_f32(1.0 / Self::FRAMES_PER_SECOND);
-        let mut interval = tokio::time::interval(period);
-        let mut events = EventStream::new();
         while !self.should_quit {
-            tokio::select! {
-                _ = interval.tick() => { terminal.draw(|frame| self.render(frame))?; },
-                Some(Ok(event)) = events.next() => self.handle_event(&event),
+            terminal.draw(|frame| frame.render_widget(&self, frame.area()))?;
+            match self.events.next().await? {
+                Event::Redraw=>{}
+                Event::Crossterm(event) => match event {
+                    crossterm::event::Event::Key(key_event) => self.handle_key_events(key_event)?,
+                    _ => {}
+                },
+                Event::App(app_event) => match app_event {
+                    AppEvent::InputUp => self.scroll_up(),
+                    AppEvent::InputDown => self.scroll_down(),
+                    AppEvent::Quit => self.quit(),
+                },
             }
         }
         Ok(())
     }
 
-    fn render(&self, frame: &mut Frame) {
-        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]);
-        let [title_area, body_area] = vertical.areas(frame.area());
-        let title = Line::from("Rustydex").centered().bold();
-        frame.render_widget(title, title_area);
-        match &self.current_screen {
-            CurrentScreen::Pokedex(widget) => frame.render_widget(widget, body_area),
+
+    fn handle_key_events(&mut self, key_event: KeyEvent) -> color_eyre::Result<()> {
+        match key_event.code {
+            KeyCode::Esc | KeyCode::Char('q') => self.events.send(AppEvent::Quit),
+            KeyCode::Char('c' | 'C') if key_event.modifiers == KeyModifiers::CONTROL => {
+                self.events.send(AppEvent::Quit)
+            }
+            KeyCode::Up => self.events.send(AppEvent::InputUp),
+            KeyCode::Down => self.events.send(AppEvent::InputDown),
+            _ => {}
         }
+        Ok(())
     }
 
-    fn handle_event(&mut self, event: &Event) {
-        if let Event::Key(key) = event {
-            if key.kind == KeyEventKind::Press {
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
-                    KeyCode::Char('j') | KeyCode::Down => self.scroll_down(),
-                    KeyCode::Char('k') | KeyCode::Up => self.scroll_up(),
-                    _ => {}
-                }
-            }
-        }
+    fn quit(&mut self) {
+        self.should_quit = true;
     }
 
     fn scroll_down(&self) {
@@ -89,90 +113,27 @@ impl App {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PokedexWidget {
-    list_widget: PokedexListWidget,
-    pokemon_widget : PokedexPokemonWidget
+    pub sender : UnboundedSender<Event>,
+    pub state: Arc<RwLock<PokedexState>>,
 }
-
-impl Default for PokedexWidget {
-    fn default() -> Self {
-        Self {
-            list_widget: PokedexListWidget::new(1),
-            pokemon_widget: PokedexPokemonWidget::default(),
-        }
-    }
-}
-
-impl Widget for &PokedexWidget {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let chunks = Layout::horizontal([Constraint::Length(24), Constraint::Min(0)]).split(area);
-        self.list_widget.render(chunks[0], buf);
-        self.pokemon_widget.render(chunks[1], buf);
-    }
-}
-
-
 
 impl PokedexWidget {
-    fn run(&self) {
-        self.list_widget.run();
+    fn new(sender: UnboundedSender<Event>) ->Self{
+        Self
+        {
+            sender: sender.clone(),
+            state: Arc::new(RwLock::new(PokedexState::new(sender)))
+        }
     }
 
-    fn set_dex_id(&mut self, id: i64) {
-        self.list_widget.set_dex(id);
+    pub fn run(&self) {
+        let this = self.clone();
+        tokio::spawn(this.fetch_dex());
     }
-
-    fn scroll_down(&self) {
-        match self.list_widget.scroll_down(){
-            Some(name) => self.pokemon_widget.set_mon(name),
-            None=>{},
-        };
-    }
-    fn scroll_up(&self) {
-        match self.list_widget.scroll_up(){
-            Some(name) => self.pokemon_widget.set_mon(name),
-            None=>{},
-        };
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PokedexListWidget {
-    state: Arc<RwLock<PokedexListState>>,
-}
-
-impl Widget for &PokedexListWidget {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let mut state = self.state.write().unwrap();
-        let loading_state = Line::from(format!("{:?}", state.loading_state));
-        let block = Block::bordered()
-            .title("Pokedex")
-            .title(loading_state)
-            .title_bottom("j/k to scroll");
-        let rows: Vec<Row> = state
-            .pokedex
-            .pokemon_entries
-            .iter()
-            .map(|entry| {
-                Row::new(vec![
-                    format!("#{:0>4}", entry.entry_number),
-                    entry.pokemon_species.name.clone(),
-                ])
-            })
-            .collect();
-        let widths = [Constraint::Length(5), Constraint::Fill(1)];
-        let table = Table::new(rows, widths)
-            .block(block)
-            .highlight_spacing(ratatui::widgets::HighlightSpacing::Always)
-            .highlight_symbol(">>")
-            .row_highlight_style(Style::new().black().on_blue());
-        StatefulWidget::render(table, area, buf, &mut state.table_state);
-    }
-}
-
-impl PokedexListWidget {
-    fn run(&self) {
+    pub fn set_dex(self, id: i64) {
+        self.state.write().unwrap().dex_id = id;
         let this = self.clone();
         tokio::spawn(this.fetch_dex());
     }
@@ -182,100 +143,153 @@ impl PokedexListWidget {
         self.set_loading_state(LoadingState::Loading);
         let id = self.state.read().unwrap().dex_id;
         match rustemon::games::pokedex::get_by_id(id, &rustemon_client).await {
-            Ok(dex) => self.on_load(dex),
+            Ok(dex) => self.on_load_dex(dex),
             Err(err) => self.on_err(err),
         }
     }
-    fn new(id: i64) -> Self {
-        Self {
-            state: Arc::new(RwLock::new(PokedexListState::new(id))),
-        }
-    }
 
-    fn set_dex(&self, id: i64) {
-        self.set_loading_state(LoadingState::Loading);
-        self.state.write().unwrap().dex_id = id;
-    }
     fn set_loading_state(&self, state: LoadingState) {
         self.state.write().unwrap().loading_state = state;
+    }
+
+    fn on_load_dex(&self, dex: Pokedex) {
+        self.set_loading_state(LoadingState::Loaded);
+        let mut state = self.state.write().unwrap();
+        state.pokedex = dex;
+        state.list_widget.entries = state.pokedex.pokemon_entries.clone();
+        match state.list_widget.select(Some(0)) {
+            Some(mon_name) => state.pokemon_view_widget.set_mon(mon_name),
+            None => {}
+        }
+        let _ = self.sender.send(Event::Redraw);
     }
 
     fn on_err(&self, err: Error) {
         self.set_loading_state(LoadingState::Error(err.to_string()));
     }
 
-    fn on_load(&self, dex: Pokedex) {
-        self.set_loading_state(LoadingState::Loaded);
+    fn scroll_up(&self) {
         let mut state = self.state.write().unwrap();
-        state.pokedex = dex;
-        state.table_state.select(Some(0));
-    }
-
-    pub fn scroll_down(&self) -> Option<String>{
-        let mut state =self.state.write().unwrap();
-        state.table_state.scroll_down_by(1);
-        match state.table_state.selected()
-        {
-            Some(index)=> {return Some(state.pokedex.pokemon_entries[index].pokemon_species.name.clone())}
-            None=> {return  None;}
+        let new_mon = state.list_widget.scroll_up();
+        drop(state);
+        match new_mon {
+            Some(mon_name) => {
+                let state = self.state.read().unwrap();
+                state.pokemon_view_widget.set_mon(mon_name)
+            }
+            None => {}
         }
     }
-    pub fn scroll_up(&self) -> Option<String>{
-        let mut state =self.state.write().unwrap();
-        state.table_state.scroll_up_by(1);
-        match state.table_state.selected()
-        {
-            Some(index)=> {return Some(state.pokedex.pokemon_entries[index].pokemon_species.name.clone())}
-            None=> {return  None;}
+    fn scroll_down(&self) {
+        let mut state = self.state.write().unwrap();
+        let new_mon = state.list_widget.scroll_down();
+        drop(state);
+        match new_mon {
+            Some(mon_name) => {
+                let state = self.state.read().unwrap();
+                state.pokemon_view_widget.set_mon(mon_name)
+            }
+            None => {}
         }
     }
 }
 
 #[derive(Debug)]
-struct PokedexListState {
+pub struct PokedexState {
     dex_id: i64,
-    loading_state: LoadingState,
+    pub loading_state: LoadingState,
     pokedex: Pokedex,
-    table_state: TableState,
+    pub list_widget: PokedexListWidget,
+    pub pokemon_view_widget: PokedexViewWidget,
 }
 
-impl PokedexListState {
-    pub fn new(id: i64) -> Self {
+
+
+impl PokedexState
+{
+    fn new(sender: UnboundedSender<Event>)->Self
+    {
         Self {
-            dex_id: id,
-            loading_state: LoadingState::default(),
-            pokedex: Pokedex::default(),
-            table_state: TableState::default(),
+            dex_id: 1,
+            loading_state: Default::default(),
+            pokedex: Default::default(),
+            list_widget: PokedexListWidget::new(sender.clone()),
+            pokemon_view_widget: PokedexViewWidget::new(sender.clone()),
         }
     }
 }
 
-#[derive(Debug, Clone, Default)]
-struct PokedexPokemonWidget {
-    state: Arc<RwLock<PokedexPokemonState>>,
+
+#[derive(Debug)]
+pub struct PokedexListWidget {
+    sender: UnboundedSender<Event>,
+    pub entries: Vec<PokemonEntry>,
+    pub table_state: TableState,
+    pub query : String
 }
 
-impl PokedexPokemonWidget {
-    fn run(&self) {
-        let this = self.clone();
-        tokio::spawn(this.fetch_mon());
+impl PokedexListWidget {
+    fn scroll_down(&mut self) -> Option<String> {
+        self.table_state.scroll_down_by(1);
+        match self.table_state.selected() {
+            Some(index) => match self.entries.get(index) {
+                Some(entry) => return Some(entry.pokemon_species.name.clone()),
+                None => return None,
+            },
+            None => return None,
+        }
+    }
+    fn scroll_up(&mut self) -> Option<String> {
+        self.table_state.scroll_up_by(1);
+        match self.table_state.selected() {
+            Some(index) => match self.entries.get(index) {
+                Some(entry) => return Some(entry.pokemon_species.name.clone()),
+                None => return None,
+            },
+            None => return None,
+        }
     }
 
-    async fn fetch_mon(self) {
+    fn select(&mut self, index: Option<usize>) -> Option<String> {
+        self.table_state.select(index);
+        self.table_state.scroll_up_by(1);
+        match self.table_state.selected() {
+            Some(index) => match self.entries.get(index) {
+                Some(entry) => return Some(entry.pokemon_species.name.clone()),
+                None => return None,
+            },
+            None => return None,
+        }
+    }
+
+    
+    fn new(sender: UnboundedSender<Event>) -> Self {
+        Self { sender, entries: Default::default(), table_state: Default::default(), query: String::default() }
+    }
+}
+
+
+
+#[derive(Debug, Clone)]
+pub struct PokedexViewWidget {
+    sender : UnboundedSender<Event>,
+    pub state: Arc<RwLock<PokedexViewState>>,
+}
+
+impl PokedexViewWidget {
+    async fn fetch_mon(self, name: String) {
         let rustemon_client = rustemon::client::RustemonClient::default();
-        self.set_loading_state(LoadingState::Loading);
-        let name = self.state.read().unwrap().name.clone();
+        //self.set_loading_state(LoadingState::Loading);
         match rustemon::pokemon::pokemon::get_by_name(name.as_str(), &rustemon_client).await {
             Ok(mon) => self.on_load(mon),
             Err(err) => self.on_err(err),
         }
     }
 
-    fn set_mon(&self,name: String)
-    {
+    fn set_mon(&self, name: String) {
         self.set_loading_state(LoadingState::Loading);
-        self.state.write().unwrap().name = name;
-        self.run();
+        let this = self.clone();
+        tokio::spawn(this.fetch_mon(name));
     }
 
     fn set_loading_state(&self, state: LoadingState) {
@@ -290,32 +304,18 @@ impl PokedexPokemonWidget {
         self.set_loading_state(LoadingState::Loaded);
         let mut state = self.state.write().unwrap();
         state.pokemon = Some(mon);
+        let _ = self.sender.send(Event::Redraw);
+    }
+    
+    fn new(sender: UnboundedSender<Event>) -> Self {
+        Self { sender, state: Default::default() }
     }
 }
 
-impl Widget for &PokedexPokemonWidget {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let state = self.state.read().unwrap();
-        let loading_state = Line::from(format!("{:?}", state.loading_state));
-        let block = Block::bordered()
-            .title(state.name.clone())
-            .title(loading_state);
-        match &state.pokemon {
-            None=> {block.render(area, buf);}
-            Some(mon)=>
-            {
-                let lines : Vec<Line> = mon.stats.iter().map(|stat| Line::from(format!("{:}:{:}", stat.stat.name, stat.base_stat))).collect();
-                let paragraph = Paragraph::new(lines).block(block);
-                paragraph.render(area, buf);
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-#[derive(Default)]
-struct PokedexPokemonState {
-    name: String,
-    pokemon: Option<Pokemon>,
-    loading_state: LoadingState,
+#[derive(Debug, Default)]
+pub struct PokedexViewState {
+    pub name: String,
+    pub pokemon: Option<Pokemon>,
+    pub loading_state: LoadingState,
+    pub ability_table_state: TableState
 }

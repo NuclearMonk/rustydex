@@ -1603,11 +1603,10 @@ dependencies = [
 
 [[package]]
 name = "rustemon"
-version = "4.0.0"
+version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abb4883ffecbca596369a77f25a7b594d0fcdf86262c124b401c141cedbb9c3e"
+checksum = "12e864d7eb160611710fb553eac93f5260a5b1be3ed37999485f551f75e99bae"
 dependencies = [
- "async-trait",
  "http-cache-reqwest",
  "reqwest",
  "reqwest-middleware",
@@ -1692,6 +1691,7 @@ version = "0.1.0"
 dependencies = [
  "color-eyre",
  "crossterm",
+ "futures",
  "ratatui",
  "rustemon",
  "tokio",
