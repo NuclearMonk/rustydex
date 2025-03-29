@@ -25,11 +25,7 @@ impl Widget for &DetailsWidget {
             LoadingState::Loading(name) => {
                 block.render(area, buf);
             }
-            LoadingState::Loaded(name) => match &state.pokemon.clone() { //This Shite
-                None => {
-                    block.render(area, buf);
-                }
-                Some(mon) => {
+            LoadingState::Loaded(pokemon) =>{//This Shite
                     let [left, right] =
                         Layout::horizontal([Constraint::Fill(1), Constraint::Fill(1)])
                             .areas(block.inner(area));
@@ -41,18 +37,18 @@ impl Widget for &DetailsWidget {
                         Constraint::Length(8),
                     ])
                     .areas(left);
-                    Span::from(mon.name.to_uppercase()).bold().render(name, buf);
-                    render_types(&mon.types, types, buf);
-                    render_stats(&mon.stats, stats, buf);
+                    Span::from(pokemon.name.to_uppercase()).bold().render(name, buf);
+                    render_types(&pokemon.types, types, buf);
+                    render_stats(&pokemon.stats, stats, buf);
                     render_abilities(
-                        &mon.abilities,
+                        &pokemon.abilities,
                         &mut state.ability_table_state,
                         abilities,
                         buf,
                     );
-                    render_moves(&mon.moves, right, buf);
+                    render_moves(&pokemon.moves, right, buf);
                     block.render(area, buf);
-                }
+                
             },
             _ => {}
         }

@@ -12,7 +12,7 @@ pub enum LoadingState
 {
     #[default] Idle,
     Loading(PokemonName),
-    Loaded(PokemonName),
+    Loaded(Pokemon),
     Error(String)
 }
 
@@ -23,7 +23,7 @@ impl fmt::Display for LoadingState
         {
             LoadingState::Idle => write!(f, "Idle"),
             LoadingState::Loading(name) => write!(f, "Loading {0}", name),
-            LoadingState::Loaded(name) => write!(f, "Loaded {0}", name),
+            LoadingState::Loaded(pokemon) => write!(f, "Loaded {0}", pokemon.name),
             LoadingState::Error(error) => write!(f, "Error {0}", error),
         }
     }
@@ -68,8 +68,7 @@ impl DetailsWidget {
             {
                 if name == mon.name
                 {
-                    state.pokemon = Some(mon);
-                    state.loading_state = LoadingState::Loaded(name);
+                    state.loading_state = LoadingState::Loaded(mon);
                     let _ = self.sender.send(Event::App(AppEvent::Redraw));
 
                 }
@@ -90,7 +89,6 @@ impl DetailsWidget {
 #[derive(Debug, Default)]
 pub struct DetailsState {
     focused : bool,
-    pub pokemon: Option<Pokemon>,
     loading_state: LoadingState,
     pub ability_table_state: TableState,
 }
