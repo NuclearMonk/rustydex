@@ -1,5 +1,8 @@
+pub mod navigation;
+
 use color_eyre::eyre::OptionExt;
 use futures::{FutureExt, StreamExt};
+use navigation::NavDirection;
 use ratatui::crossterm::event::Event as CrosstermEvent;
 use tokio::sync::mpsc;
 
@@ -8,12 +11,6 @@ use tokio::sync::mpsc;
 /// Representation of all possible events.
 #[derive(Clone, Debug)]
 pub enum Event {
-    /// An event that is emitted on a regular schedule.
-    ///
-    /// Use this event to run any code which has to run outside of being a direct response to a user
-    /// event. e.g. polling exernal systems, updating animations, or rendering the UI based on a
-    /// fixed frame rate.
-    Redraw,
     /// Crossterm events.
     ///
     /// These events are emitted by the terminal.
@@ -25,15 +22,12 @@ pub enum Event {
 }
 
 /// Application events.
-///
-/// You can extend this enum with your own custom events.
 #[derive(Clone, Debug)]
 pub enum AppEvent {
-    InputUp,
-    InputDown,
-
-    /// Quit the application.
+    /// Trigger a screen Redraw
+    Redraw,
     Quit,
+    Navigation(NavDirection),
 }
 
 /// Terminal event handler.
