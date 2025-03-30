@@ -3,6 +3,7 @@ use std::str::FromStr;
 use ratatui::style::Color;
 
 pub type PokemonName= String;
+pub type AbilityName = String;
 
 pub enum MonStat {
     HP,

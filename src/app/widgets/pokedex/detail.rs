@@ -1,26 +1,32 @@
-use std::{fmt, sync::{Arc, RwLock}};
+use std::{
+    default, fmt,
+    sync::{Arc, RwLock},
+};
 
 use ratatui::widgets::TableState;
 use rustemon::{error::Error, model::pokemon::Pokemon};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{events::{navigation::Navigation, AppEvent, Event}, pokemon::PokemonName};
 use crate::events::navigation::NavDirection;
+use crate::{
+    events::{AppEvent, Event, navigation::Navigation},
+    pokemon::PokemonName,
+};
+
+use super::abilities::AbilitiesWidget;
 
 #[derive(Debug, Clone, Default)]
-pub enum LoadingState
-{
-    #[default] Idle,
+pub enum LoadingState {
+    #[default]
+    Idle,
     Loading(PokemonName),
     Loaded(Pokemon),
-    Error(String)
+    Error(String),
 }
 
-impl fmt::Display for LoadingState
-{
+impl fmt::Display for LoadingState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self
-        {
+        match self {
             LoadingState::Idle => write!(f, "Idle"),
             LoadingState::Loading(name) => write!(f, "Loading {0}", name),
             LoadingState::Loaded(pokemon) => write!(f, "Loaded {0}", pokemon.name),
@@ -32,6 +38,7 @@ impl fmt::Display for LoadingState
 #[derive(Debug, Clone)]
 pub struct DetailsWidget {
     sender: UnboundedSender<Event>,
+    pub abilities: AbilitiesWidget,
     pub state: Arc<RwLock<DetailsState>>,
 }
 
@@ -62,33 +69,38 @@ impl DetailsWidget {
 
     fn on_load(&self, mon: Pokemon) {
         let mut state = self.state.write().unwrap();
-        match state.loading_state.clone()
-        {
-            LoadingState::Loading(name) => 
-            {
-                if name == mon.name
-                {
+        match state.loading_state.clone() {
+            LoadingState::Loading(name) => {
+                if name == mon.name {
+                    self.abilities.set_abilities(mon.abilities.clone());
                     state.loading_state = LoadingState::Loaded(mon);
                     let _ = self.sender.send(Event::App(AppEvent::Redraw));
-
                 }
-            } ,
+            }
             _ => {}
         }
     }
 
     pub fn new(sender: UnboundedSender<Event>) -> Self {
         Self {
-            sender,
+            sender: sender.clone(),
+            abilities: AbilitiesWidget::new(sender.clone()),
             state: Default::default(),
         }
     }
+}
 
+#[derive(Debug, Clone, Copy, Default)]
+enum DetailsFocus {
+    #[default]
+    Abilities,
+    Moves,
 }
 
 #[derive(Debug, Default)]
 pub struct DetailsState {
-    focused : bool,
+    focused: bool,
+    current_focus: DetailsFocus,
     loading_state: LoadingState,
     pub ability_table_state: TableState,
 }
@@ -97,33 +109,46 @@ impl DetailsState {
     pub fn focused(&self) -> bool {
         self.focused
     }
-    
+
     pub fn loading_state(&self) -> &LoadingState {
         &self.loading_state
     }
-    
-    
 }
 
-impl Navigation for &DetailsWidget
-{
-    fn handle_navigation_input(self, direction: NavDirection)-> bool {
-        match direction {
-            NavDirection::Up | NavDirection::Down => true,
-            _ => false,
+impl Navigation for &DetailsWidget {
+    fn handle_navigation_input(self, direction: NavDirection) -> bool {
+        let mut state = self.state.write().unwrap();
+        match (state.current_focus, direction) {
+            (DetailsFocus::Abilities, NavDirection::Tab) => {
+                self.abilities.focus();
+                state.current_focus = DetailsFocus::Moves;
+
+                true
+            }
+            (DetailsFocus::Abilities, NavDirection::BackTab) => false,
+            (DetailsFocus::Abilities, direction) => {
+                self.abilities.handle_navigation_input(direction)
+            }
+            (DetailsFocus::Moves, NavDirection::Up | NavDirection::Down) => false, //todo
+            (DetailsFocus::Moves, NavDirection::Tab) => false,
+            (DetailsFocus::Moves, NavDirection::BackTab) => {
+                state.current_focus = DetailsFocus::Abilities;
+                self.abilities.focus();
+                true
+            }
         }
     }
 
     fn focus(self) {
-        self.state.write().unwrap().focused= true;
+        self.state.write().unwrap().focused = true;
+        self.state.write().unwrap().current_focus = DetailsFocus::Abilities;
+        self.abilities.focus();
         let _ = self.sender.send(Event::App(AppEvent::Redraw));
-
-        
     }
 
     fn unfocus(self) {
+        self.abilities.unfocus();
         self.state.write().unwrap().focused= false;
         let _ = self.sender.send(Event::App(AppEvent::Redraw));
     }
-    
 }

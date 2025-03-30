@@ -5,9 +5,9 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span, Text},
-    widgets::{Block, Gauge, Row, StatefulWidget, Table, TableState, Widget},
+    widgets::{Block, Gauge, Widget},
 };
-use rustemon::model::pokemon::{PokemonAbility, PokemonMove, PokemonStat, PokemonType};
+use rustemon::model::pokemon::{PokemonMove, PokemonStat, PokemonType};
 
 use crate::{
     app::widgets::pokedex::detail::{LoadingState, DetailsWidget}, pokemon::{MonStat, MonType}
@@ -15,7 +15,7 @@ use crate::{
 
 impl Widget for &DetailsWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let mut state = self.state.write().unwrap();
+        let state = self.state.write().unwrap();
         let loading_state =
             Line::from(format!("{0}", state.loading_state())).alignment(Alignment::Right);
 
@@ -23,6 +23,7 @@ impl Widget for &DetailsWidget {
             .title(loading_state).border_style(if state.focused(){Style::default().fg(Color::Blue)} else {Style::default()});
         match state.loading_state().clone() {
             LoadingState::Loading(name) => {
+                Span::from(name.to_uppercase()).bold().render(block.inner(area), buf);
                 block.render(area, buf);
             }
             LoadingState::Loaded(pokemon) =>{//This Shite
@@ -40,12 +41,14 @@ impl Widget for &DetailsWidget {
                     Span::from(pokemon.name.to_uppercase()).bold().render(name, buf);
                     render_types(&pokemon.types, types, buf);
                     render_stats(&pokemon.stats, stats, buf);
-                    render_abilities(
-                        &pokemon.abilities,
-                        &mut state.ability_table_state,
-                        abilities,
-                        buf,
-                    );
+                    // render_abilities(
+                    //     &pokemon.abilities,
+                    //     &mut state.ability_table_state,
+                    //     abilities,
+                    //     buf,
+                    // );
+                    self.abilities.clone().render(abilities, buf);
+
                     render_moves(&pokemon.moves, right, buf);
                     block.render(area, buf);
                 
@@ -80,30 +83,30 @@ fn render_stats(stats: &Vec<PokemonStat>, area: Rect, buf: &mut Buffer) {
     render_stat(MonStat::SpecialDefense, stats[4].base_stat, sdef, buf);
     render_stat(MonStat::Speed, stats[5].base_stat, spd, buf);
 }
-fn render_abilities(
-    abilities: &Vec<PokemonAbility>,
-    state: &mut TableState,
-    area: Rect,
-    buf: &mut Buffer,
-) {
-    let block = Block::bordered().title("Abilities");
-    let rows: Vec<Row> = abilities
-        .iter()
-        .map(|a| {
-            Row::new(vec![
-                a.ability.name.to_uppercase(),
-                if a.is_hidden {
-                    String::from("Hidden")
-                } else {
-                    String::new()
-                },
-            ])
-        })
-        .collect();
-    let widths = [Constraint::Fill(1), Constraint::Length(6)];
-    let list = Table::new(rows, widths).block(block);
-    StatefulWidget::render(list, area, buf, state);
-}
+// fn render_abilities(
+//     abilities: &Vec<PokemonAbility>,
+//     state: &mut TableState,
+//     area: Rect,
+//     buf: &mut Buffer,
+// ) {
+//     let block = Block::bordered().title("Abilities");
+//     let rows: Vec<Row> = abilities
+//         .iter()
+//         .map(|a| {
+//             Row::new(vec![
+//                 a.ability.name.to_uppercase(),
+//                 if a.is_hidden {
+//                     String::from("Hidden")
+//                 } else {
+//                     String::new()
+//                 },
+//             ])
+//         })
+//         .collect();
+//     let widths = [Constraint::Fill(1), Constraint::Length(6)];
+//     let list = Table::new(rows, widths).block(block);
+//     StatefulWidget::render(list, area, buf, state);
+// }
 fn render_moves(moves: &Vec<PokemonMove>, area: Rect, buf: &mut Buffer) {
     let block = Block::bordered().title("Moves");
     block.render(area, buf)

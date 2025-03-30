@@ -1,6 +1,6 @@
 use ratatui::{buffer::Buffer, layout::{Constraint, Layout, Rect}, style::{Color, Style, Stylize}, widgets::{Block, Row, StatefulWidget, Table, Widget}};
 
-use crate::{app::widgets::pokedex::entries::EntriesWidget, events::navigation::Navigation};
+use crate::app::widgets::pokedex::entries::EntriesWidget;
 
 impl Widget for &mut EntriesWidget {
     fn render(self, area: Rect, buf: &mut Buffer)
