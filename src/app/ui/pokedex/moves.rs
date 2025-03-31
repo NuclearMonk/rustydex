@@ -3,10 +3,11 @@ use ratatui::{buffer::Buffer, layout::Rect};
 use ratatui::prelude::*;
 use tui_widget_list::{ListBuilder,ListView};
 
-use crate::app::widgets::pokedex::abilities::AbilitiesWidget;
+use crate::app::widgets::pokedex::moves::MovesWidget;
 
 
-impl Widget for &AbilitiesWidget {
+
+impl Widget for &MovesWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = self.state.write().unwrap();
         let widgets = state.widgets.clone();

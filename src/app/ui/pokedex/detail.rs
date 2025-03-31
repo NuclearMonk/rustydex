@@ -48,8 +48,8 @@ impl Widget for &DetailsWidget {
                     //     buf,
                     // );
                     self.abilities.clone().render(abilities, buf);
-
-                    render_moves(&pokemon.moves, right, buf);
+                    self.moves.clone().render(right, buf);
+                    // render_moves(&pokemon.moves, right, buf);
                     block.render(area, buf);
                 
             },

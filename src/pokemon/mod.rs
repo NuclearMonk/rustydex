@@ -4,6 +4,7 @@ use ratatui::style::Color;
 
 pub type PokemonName= String;
 pub type AbilityName = String;
+pub type MoveName = String;
 
 pub enum MonStat {
     HP,

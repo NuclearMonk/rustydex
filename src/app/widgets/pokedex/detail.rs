@@ -13,7 +13,7 @@ use crate::{
     pokemon::PokemonName,
 };
 
-use super::abilities::AbilitiesWidget;
+use super::{abilities::AbilitiesWidget, moves::MovesWidget};
 
 #[derive(Debug, Clone, Default)]
 pub enum LoadingState {
@@ -39,6 +39,7 @@ impl fmt::Display for LoadingState {
 pub struct DetailsWidget {
     sender: UnboundedSender<Event>,
     pub abilities: AbilitiesWidget,
+    pub moves : MovesWidget,
     pub state: Arc<RwLock<DetailsState>>,
 }
 
@@ -73,6 +74,7 @@ impl DetailsWidget {
             LoadingState::Loading(name) => {
                 if name == mon.name {
                     self.abilities.set_abilities(mon.abilities.clone());
+                    self.moves.set_moves(mon.moves.clone());
                     state.loading_state = LoadingState::Loaded(mon);
                     let _ = self.sender.send(Event::App(AppEvent::Redraw));
                 }
@@ -85,6 +87,7 @@ impl DetailsWidget {
         Self {
             sender: sender.clone(),
             abilities: AbilitiesWidget::new(sender.clone()),
+            moves: MovesWidget::new(sender.clone()),
             state: Default::default(),
         }
     }
@@ -120,8 +123,9 @@ impl Navigation for &DetailsWidget {
         let mut state = self.state.write().unwrap();
         match (state.current_focus, direction) {
             (DetailsFocus::Abilities, NavDirection::Tab) => {
-                self.abilities.focus();
+                self.abilities.unfocus();
                 state.current_focus = DetailsFocus::Moves;
+                self.moves.focus();
 
                 true
             }
@@ -129,9 +133,10 @@ impl Navigation for &DetailsWidget {
             (DetailsFocus::Abilities, direction) => {
                 self.abilities.handle_navigation_input(direction)
             }
-            (DetailsFocus::Moves, NavDirection::Up | NavDirection::Down) => false, //todo
+            (DetailsFocus::Moves, NavDirection::Up | NavDirection::Down) => self.moves.handle_navigation_input(direction), //todo
             (DetailsFocus::Moves, NavDirection::Tab) => false,
             (DetailsFocus::Moves, NavDirection::BackTab) => {
+                self.moves.unfocus();
                 state.current_focus = DetailsFocus::Abilities;
                 self.abilities.focus();
                 true

@@ -125,10 +125,13 @@ impl Navigation for &PokedexScreen
         let used = match state.current_focus {
             PokedexScreenFocus::List => {
                 let used = self.entries.handle_navigation_input(direction);
-                match self.entries.get_selectected() {
-                    Some(mon_name) => self.detail_view.set_mon(mon_name),
-                    None => {}
+                if used {
+                    match self.entries.get_selectected() {
+                        Some(mon_name) => self.detail_view.set_mon(mon_name),
+                        None => {}
+                    }
                 }
+
                 used
             }
             PokedexScreenFocus::Details => self

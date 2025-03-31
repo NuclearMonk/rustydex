@@ -1,23 +1,23 @@
 use std::sync::{Arc, RwLock};
 
-use rustemon::model::pokemon::PokemonAbility;
+use rustemon::model::pokemon::{PokemonAbility, PokemonMove};
 use tokio::sync::mpsc::UnboundedSender;
 use tui_widget_list::ListState;
 
 use crate::events::{navigation::{NavDirection, Navigation}, AppEvent, Event};
 
-use super::ability::AbilityWidget;
+use super::monmove::MoveWidget;
 
 
 
 
 #[derive(Debug, Clone)]
-pub struct AbilitiesWidget {
+pub struct MovesWidget {
     sender: UnboundedSender<Event>,
-    pub state: Arc<RwLock<AbilitiesState>>,
+    pub state: Arc<RwLock<MovesState>>,
 }
 
-impl AbilitiesWidget {
+impl MovesWidget {
     pub fn new(sender: UnboundedSender<Event>) -> Self {
         Self {
             sender,
@@ -25,12 +25,12 @@ impl AbilitiesWidget {
         }
     }
 
-    pub fn set_abilities(&self, abilities: Vec<PokemonAbility>) {
+    pub fn set_moves(&self, moves: Vec<PokemonMove>) {
         let mut state = self.state.write().unwrap();
         state.widgets.clear();
         state.list_state = ListState::default();
-        for ability in abilities {
-            state.widgets.push(AbilityWidget::new(self.sender.clone(),ability));
+        for move_ in moves {
+            state.widgets.push(MoveWidget::new(self.sender.clone(),move_));
         }
         state.list_state.select(Some(0));
 
@@ -42,13 +42,13 @@ impl AbilitiesWidget {
 
 
 #[derive(Debug, Default)]
-pub struct AbilitiesState {
+pub struct MovesState {
     focused: bool,
-    pub widgets: Vec<AbilityWidget>,
+    pub widgets: Vec<MoveWidget>,
     pub list_state: ListState,
 }
 
-impl AbilitiesState {
+impl MovesState {
     pub fn focused(&self) -> bool {
         self.focused
     }
@@ -56,7 +56,7 @@ impl AbilitiesState {
 
 
 
-impl Navigation for &AbilitiesWidget {
+impl Navigation for &MovesWidget {
     fn handle_navigation_input(self, direction: NavDirection) -> bool {
         let consumed = match direction {
             NavDirection::Up => {self.state.write().unwrap().list_state.previous(); true},
