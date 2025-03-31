@@ -10,11 +10,12 @@ impl Widget for &AbilitiesWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = self.state.write().unwrap();
         let widgets = state.widgets.clone();
+        let focused = state.focused();
         let builder = ListBuilder::new(move |context| {
             let mut widget = widgets[context.index].clone();
-            if context.is_selected
+            if  focused && context.is_selected
             {
-                widget.style = Style::default().bg(Color::Blue);
+                widget.style = Style::default().bg(Color::Blue).fg(Color::Black);
             }
             (widget, 3)
         });

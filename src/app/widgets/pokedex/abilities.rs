@@ -28,6 +28,7 @@ impl AbilitiesWidget {
     pub fn set_abilities(&self, abilities: Vec<PokemonAbility>) {
         let mut state = self.state.write().unwrap();
         state.widgets.clear();
+        state.list_state = ListState::default();
         for ability in abilities {
             state.widgets.push(AbilityWidget::new(self.sender.clone(),ability));
         }
