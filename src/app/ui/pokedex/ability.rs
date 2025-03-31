@@ -10,11 +10,11 @@ impl Widget for AbilityWidget {
         let [header, body] = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(area);
         match state.loading_state() {
             crate::app::widgets::pokedex::ability::LoadingState::Idle => Block::default().render(area, buf),
-            crate::app::widgets::pokedex::ability::LoadingState::Loading(name) => 
+            crate::app::widgets::pokedex::ability::LoadingState::Loading(ability) => 
             {
                 let block = Block::default();
                 let [name_area, hidden_area] = Layout::horizontal([Constraint::Fill(1), Constraint::Length(6)]).areas(block.inner(header));
-                Line::from(name.to_string()).render(name_area, buf);
+                Line::from(ability.ability.name.to_string()).render(name_area, buf);
                 if state.hidden()
                 {
 

@@ -1,10 +1,10 @@
 use std::{fmt, sync::{Arc, RwLock}};
 
 use ratatui::style::Style;
-use rustemon::{error::Error, model::{moves::Move, pokemon::PokemonMove}};
+use rustemon::{error::Error, model::{moves::Move, pokemon::PokemonMove}, Follow};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{events::{AppEvent, Event}, pokemon::{get_client, MoveName}};
+use crate::{events::{AppEvent, Event}, pokemon::get_client};
 
 
 #[derive(Debug, Clone, Default)]
@@ -12,7 +12,8 @@ pub enum LoadingState
 {
     #[default]
     Idle,
-    Loading(MoveName),
+    Lazy(PokemonMove),
+    Loading(PokemonMove),
     Loaded(Move),
     Error(String)
 }
@@ -23,8 +24,9 @@ impl fmt::Display for LoadingState
         match self
         {
             LoadingState::Idle => write!(f, "Unset"),
-            LoadingState::Loading(name) => write!(f, "Loading {0}", name),
-            LoadingState::Loaded(ability) => write!(f, "Loaded {0}", ability.name),
+            LoadingState::Lazy(pokemon_move) => write!(f, "Lazy {0}", pokemon_move.move_.name),
+            LoadingState::Loading(pokemon_move) => write!(f, "Loading {0}", pokemon_move.move_.name),
+            LoadingState::Loaded(move_) => write!(f, "Loaded {0}", move_.name),
             LoadingState::Error(error) => write!(f, "Error {0}", error),
         }
     }
@@ -39,13 +41,21 @@ pub struct MoveWidget {
 
 impl MoveWidget {
     async fn fetch(self, move_: PokemonMove) {
-        let rustemon_client = get_client();
-        self.set_loading_state(LoadingState::Loading(move_.move_.name.clone()));
+        self.set_loading_state(LoadingState::Loading(move_.clone()));
 
         //self.set_loading_state(LoadingState::Loading);
-        match rustemon::moves::move_::get_by_name(&move_.move_.name, &rustemon_client).await {
+        match move_.move_.follow(&get_client()).await {
             Ok(move_) => self.on_load(move_),
             Err(err) => self.on_err(err),
+        }
+    }
+
+    pub fn load(&self)
+    {
+        let state = self.state.read().unwrap();
+        match state.loading_state.clone(){
+            LoadingState::Lazy(pokemon_move) => self.set_move(pokemon_move),
+            _ => {}
         }
     }
 
@@ -66,9 +76,9 @@ impl MoveWidget {
         let mut state = self.state.write().unwrap();
         match state.loading_state.clone()
         {
-            LoadingState::Loading(name) => 
+            LoadingState::Loading(pokmon_move) => 
             {
-                if name == move_.name
+                if move_.name == pokmon_move.move_.name
                 {
                     state.loading_state = LoadingState::Loaded(move_);
                     let _ = self.sender.send(Event::App(AppEvent::Redraw));
@@ -81,15 +91,12 @@ impl MoveWidget {
     }
 
     pub fn new(sender: UnboundedSender<Event>, move_: PokemonMove) -> Self {
-        let s = Self {
+        Self {
             sender: sender.clone(),
             style: Default::default(),
-            state: Default::default()
-        };
-        s.set_move(move_);
-        s
+            state: Arc::new(RwLock::new(MoveState{loading_state: LoadingState::Lazy(move_)}))}
+        }
 
-    }
 
 }
 

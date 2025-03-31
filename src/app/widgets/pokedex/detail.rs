@@ -83,6 +83,7 @@ impl DetailsWidget {
         }
     }
 
+
     pub fn new(sender: UnboundedSender<Event>) -> Self {
         Self {
             sender: sender.clone(),

@@ -5,7 +5,7 @@ use rustemon::client::{CACacheManager, CacheMode, CacheOptions, RustemonClient, 
 
 pub type PokemonName= String;
 pub type AbilityName = String;
-pub type MoveName = String;
+pub type PokemonMove = String;
 
 pub fn get_client()-> RustemonClient
 {

@@ -1,7 +1,7 @@
 use std::{default, fmt, sync::{Arc, RwLock}};
 
 use ratatui::style::Style;
-use rustemon::{error::Error, model::pokemon::{Ability, PokemonAbility}};
+use rustemon::{error::Error, model::pokemon::{Ability, PokemonAbility}, pokemon::ability, Follow};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{events::{AppEvent, Event}, pokemon::{get_client, AbilityName}};
@@ -12,7 +12,7 @@ pub enum LoadingState
 {
     #[default]
     Idle,
-    Loading(AbilityName),
+    Loading(PokemonAbility),
     Loaded(Ability),
     Error(String)
 }
@@ -23,7 +23,7 @@ impl fmt::Display for LoadingState
         match self
         {
             LoadingState::Idle => write!(f, "Unset"),
-            LoadingState::Loading(name) => write!(f, "Loading {0}", name),
+            LoadingState::Loading(ability) => write!(f, "Loading {0}", ability.ability.name),
             LoadingState::Loaded(ability) => write!(f, "Loaded {0}", ability.name),
             LoadingState::Error(error) => write!(f, "Error {0}", error),
         }
@@ -39,11 +39,10 @@ pub struct AbilityWidget {
 
 impl AbilityWidget {
     async fn fetch(self, ability: PokemonAbility) {
-        let rustemon_client = get_client();
-        self.set_loading_state(LoadingState::Loading(ability.ability.name.clone()));
+        self.set_loading_state(LoadingState::Loading(ability.clone()));
 
         //self.set_loading_state(LoadingState::Loading);
-        match rustemon::pokemon::ability::get_by_name(&ability.ability.name, &rustemon_client).await {
+        match ability.ability.follow( &get_client()).await {
             Ok(ability) => self.on_load(ability),
             Err(err) => self.on_err(err),
         }
@@ -67,9 +66,9 @@ impl AbilityWidget {
         let mut state = self.state.write().unwrap();
         match state.loading_state.clone()
         {
-            LoadingState::Loading(name) => 
+            LoadingState::Loading(pa) => 
             {
-                if name == ability.name
+                if pa.ability.name == ability.name
                 {
                     state.loading_state = LoadingState::Loaded(ability);
                     let _ = self.sender.send(Event::App(AppEvent::Redraw));

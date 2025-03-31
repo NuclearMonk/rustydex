@@ -11,11 +11,11 @@ impl Widget for MoveWidget {
         let [header, body] = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(area);
         match state.loading_state() {
             LoadingState::Idle => Block::default().render(area, buf),
-            LoadingState::Loading(name) => 
+            LoadingState::Loading(pokemon_move)  | LoadingState::Lazy(pokemon_move)=> 
             {
                 let block = Block::default();
                 let [name_area, hidden_area] = Layout::horizontal([Constraint::Fill(1), Constraint::Length(6)]).areas(block.inner(header));
-                Line::from(name.to_string()).render(name_area, buf);
+                Line::from(pokemon_move.move_.name.to_string()).render(name_area, buf);
             },
             monmove::LoadingState::Loaded(move_) => {
                 let block = Block::default().style(self.style);
