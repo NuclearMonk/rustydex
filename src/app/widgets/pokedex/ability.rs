@@ -4,7 +4,7 @@ use ratatui::style::Style;
 use rustemon::{error::Error, model::pokemon::{Ability, PokemonAbility}};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{events::{AppEvent, Event}, pokemon::AbilityName};
+use crate::{events::{AppEvent, Event}, pokemon::{get_client, AbilityName}};
 
 
 #[derive(Debug, Clone, Default)]
@@ -39,7 +39,7 @@ pub struct AbilityWidget {
 
 impl AbilityWidget {
     async fn fetch(self, ability: PokemonAbility) {
-        let rustemon_client = rustemon::client::RustemonClient::default();
+        let rustemon_client = get_client();
         self.set_loading_state(LoadingState::Loading(ability.ability.name.clone()));
 
         //self.set_loading_state(LoadingState::Loading);

@@ -4,7 +4,7 @@ use ratatui::style::Style;
 use rustemon::{error::Error, model::{moves::Move, pokemon::PokemonMove}};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{events::{AppEvent, Event}, pokemon::MoveName};
+use crate::{events::{AppEvent, Event}, pokemon::{get_client, MoveName}};
 
 
 #[derive(Debug, Clone, Default)]
@@ -39,7 +39,7 @@ pub struct MoveWidget {
 
 impl MoveWidget {
     async fn fetch(self, move_: PokemonMove) {
-        let rustemon_client = rustemon::client::RustemonClient::default();
+        let rustemon_client = get_client();
         self.set_loading_state(LoadingState::Loading(move_.move_.name.clone()));
 
         //self.set_loading_state(LoadingState::Loading);

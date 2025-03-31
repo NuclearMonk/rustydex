@@ -7,7 +7,7 @@ use ratatui::widgets::TableState;
 use rustemon::{error::Error, model::pokemon::Pokemon};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::events::navigation::NavDirection;
+use crate::{events::navigation::NavDirection, pokemon::get_client};
 use crate::{
     events::{AppEvent, Event, navigation::Navigation},
     pokemon::PokemonName,
@@ -45,7 +45,7 @@ pub struct DetailsWidget {
 
 impl DetailsWidget {
     async fn fetch_mon(self, name: String) {
-        let rustemon_client = rustemon::client::RustemonClient::default();
+        let rustemon_client = get_client();
         self.set_loading_state(LoadingState::Loading(name.clone()));
 
         //self.set_loading_state(LoadingState::Loading);

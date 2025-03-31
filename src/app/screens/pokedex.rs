@@ -3,7 +3,7 @@ use std::{fmt, sync::{Arc, RwLock}};
 use rustemon::{error::Error, model::games::Pokedex};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{app::widgets::pokedex::{detail::DetailsWidget, entries::EntriesWidget}, events::{navigation::{NavDirection, Navigation}, AppEvent, Event}};
+use crate::{app::widgets::pokedex::{detail::DetailsWidget, entries::EntriesWidget}, events::{navigation::{NavDirection, Navigation}, AppEvent, Event}, pokemon::get_client};
 
 
 
@@ -53,7 +53,7 @@ impl PokedexScreen {
     }
 
     async fn fetch_dex(self, name: String) {
-        let rustemon_client = rustemon::client::RustemonClient::default();
+        let rustemon_client = get_client();
         self.set_loading_state(LoadingState::Loading(name.clone()));
         match rustemon::games::pokedex::get_by_name(&name, &rustemon_client).await {
             Ok(dex) => self.set_loading_state(LoadingState::Loaded(dex)),
