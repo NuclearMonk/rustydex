@@ -74,10 +74,16 @@ impl App {
             KeyCode::Char('c' | 'C') if key_event.modifiers == KeyModifiers::CONTROL => {
                 self.events.send(AppEvent::Quit)
             }
-            KeyCode::Up => self.events.send(AppEvent::Navigation(NavDirection::Up)),
-            KeyCode::Down => self.events.send(AppEvent::Navigation(NavDirection::Down)),
-            KeyCode::Right => self.events.send(AppEvent::Navigation(NavDirection::Tab)),
-            KeyCode::Left => self
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.events.send(AppEvent::Navigation(NavDirection::Up))
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.events.send(AppEvent::Navigation(NavDirection::Down))
+            }
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => {
+                self.events.send(AppEvent::Navigation(NavDirection::Tab))
+            }
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab=> self
                 .events
                 .send(AppEvent::Navigation(NavDirection::BackTab)),
             _ => {}
