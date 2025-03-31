@@ -15,7 +15,7 @@ impl Widget for MoveWidget {
             {
                 let block = Block::default();
                 let [name_area, hidden_area] = Layout::horizontal([Constraint::Fill(1), Constraint::Length(6)]).areas(block.inner(header));
-                Line::from(pokemon_move.move_.name.to_string()).render(name_area, buf);
+                Line::from(state.loading_state().to_string()).render(name_area, buf);
             },
             monmove::LoadingState::Loaded(move_) => {
                 let block = Block::default().style(self.style);

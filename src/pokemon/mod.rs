@@ -9,17 +9,17 @@ pub type PokemonMove = String;
 
 pub fn get_client()-> RustemonClient
 {
-    // RustemonClientBuilder::default()
-    // .with_mode(CacheMode::NoStore)
-    // .with_manager(CACacheManager::default())
-    // .with_options(CacheOptions {
-    //     shared: true,
-    //     cache_heuristic: 0.2,
-    //     immutable_min_time_to_live: Duration::from_secs(3600),
-    //     ignore_cargo_cult: true,
-    // })
-    // .with_environment(rustemon::client::Environment::Custom("http://127.0.0.1:8000/api/v2".parse().unwrap())).try_build().unwrap()
-    RustemonClient::default()
+    RustemonClientBuilder::default()
+    .with_mode(CacheMode::ForceCache)
+    .with_manager(CACacheManager::default())
+    .with_options(CacheOptions {
+        shared: true,
+        cache_heuristic: 0.2,
+        immutable_min_time_to_live: Duration::from_secs(3600),
+        ignore_cargo_cult: true,
+    })
+    .with_environment(rustemon::client::Environment::Custom("http://127.0.0.1:8000/api/v2".parse().unwrap())).try_build().unwrap()
+    // RustemonClient::default()
 }
 
 pub enum MonStat {
