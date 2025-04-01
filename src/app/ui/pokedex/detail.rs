@@ -15,46 +15,46 @@ use crate::{
 
 impl Widget for &DetailsWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let state = self.state.write().unwrap();
-        let loading_state =
-            Line::from(format!("{0}", state.loading_state())).alignment(Alignment::Right);
+    //     let state = self.state.write().unwrap();
+    //     let loading_state =
+    //         Line::from(format!("{0}", state.loading_state())).alignment(Alignment::Right);
 
-        let block = Block::bordered()
-            .title(loading_state).border_style(if state.focused(){Style::default().fg(Color::Blue)} else {Style::default()});
-        match state.loading_state().clone() {
-            LoadingState::Loading(name,_) => {
-                Span::from(name.to_uppercase()).bold().render(block.inner(area), buf);
-                block.render(area, buf);
-            }
-            LoadingState::Loaded(pokemon) =>{//This Shite
-                    let [left, right] =
-                        Layout::horizontal([Constraint::Fill(1), Constraint::Fill(1)])
-                            .areas(block.inner(area));
-                    let [name, types, _, stats, abilities] = Layout::vertical([
-                        Constraint::Length(1),
-                        Constraint::Length(1),
-                        Constraint::Length(1),
-                        Constraint::Length(8),
-                        Constraint::Length(8),
-                    ])
-                    .areas(left);
-                    Span::from(pokemon.name.to_uppercase()).bold().render(name, buf);
-                    render_types(&pokemon.types, types, buf);
-                    render_stats(&pokemon.stats, stats, buf);
-                    // render_abilities(
-                    //     &pokemon.abilities,
-                    //     &mut state.ability_table_state,
-                    //     abilities,
-                    //     buf,
-                    // );
-                    self.abilities.clone().render(abilities, buf);
-                    self.moves.clone().render(right, buf);
-                    // render_moves(&pokemon.moves, right, buf);
-                    block.render(area, buf);
+    //     let block = Block::bordered()
+    //         .title(loading_state).border_style(if state.focused(){Style::default().fg(Color::Blue)} else {Style::default()});
+    //     match state.loading_state().clone() {
+    //         LoadingState::Loading(name,_) => {
+    //             Span::from(name.to_uppercase()).bold().render(block.inner(area), buf);
+    //             block.render(area, buf);
+    //         }
+    //         LoadingState::Loaded(pokemon) =>{//This Shite
+    //                 let [left, right] =
+    //                     Layout::horizontal([Constraint::Fill(1), Constraint::Fill(1)])
+    //                         .areas(block.inner(area));
+    //                 let [name, types, _, stats, abilities] = Layout::vertical([
+    //                     Constraint::Length(1),
+    //                     Constraint::Length(1),
+    //                     Constraint::Length(1),
+    //                     Constraint::Length(8),
+    //                     Constraint::Length(8),
+    //                 ])
+    //                 .areas(left);
+    //                 Span::from(pokemon.name.to_uppercase()).bold().render(name, buf);
+    //                 render_types(&pokemon.types, types, buf);
+    //                 render_stats(&pokemon.stats, stats, buf);
+    //                 // render_abilities(
+    //                 //     &pokemon.abilities,
+    //                 //     &mut state.ability_table_state,
+    //                 //     abilities,
+    //                 //     buf,
+    //                 // );
+    //                 self.abilities.clone().render(abilities, buf);
+    //                 self.moves.clone().render(right, buf);
+    //                 // render_moves(&pokemon.moves, right, buf);
+    //                 block.render(area, buf);
                 
-            },
-            _ => {}
-        }
+    //         },
+    //         _ => {}
+    //     }
     }
 }
 
