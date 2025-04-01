@@ -4,22 +4,22 @@ use std::{
 };
 
 use ratatui::widgets::TableState;
-use rustemon::{error::Error, model::pokemon::Pokemon};
-use tokio::sync::mpsc::UnboundedSender;
+use rustemon::{client, error::Error, model::pokemon::{self, Pokemon}};
+use tokio::{select, sync::mpsc::UnboundedSender};
 
 use crate::{events::navigation::NavDirection, pokemon::get_client};
 use crate::{
     events::{AppEvent, Event, navigation::Navigation},
     pokemon::PokemonName,
 };
-
+use tokio_util::sync::CancellationToken;
 use super::{abilities::AbilitiesWidget, moves::MovesWidget};
 
 #[derive(Debug, Clone, Default)]
 pub enum LoadingState {
     #[default]
     Idle,
-    Loading(PokemonName),
+    Loading(PokemonName,CancellationToken),
     Loaded(Pokemon),
     Error(String),
 }
@@ -28,7 +28,7 @@ impl fmt::Display for LoadingState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LoadingState::Idle => write!(f, "Idle"),
-            LoadingState::Loading(name) => write!(f, "Loading {0}", name),
+            LoadingState::Loading(name, _) => write!(f, "Loading {0}", name),
             LoadingState::Loaded(pokemon) => write!(f, "Loaded {0}", pokemon.name),
             LoadingState::Error(error) => write!(f, "Error {0}", error),
         }
@@ -46,7 +46,6 @@ pub struct DetailsWidget {
 impl DetailsWidget {
     async fn fetch_mon(self, name: String) {
         let rustemon_client = get_client();
-        self.set_loading_state(LoadingState::Loading(name.clone()));
 
         //self.set_loading_state(LoadingState::Loading);
         match rustemon::pokemon::pokemon::get_by_name(name.as_str(), &rustemon_client).await {
@@ -55,13 +54,41 @@ impl DetailsWidget {
         }
     }
 
-    pub fn set_mon(&self, name: PokemonName) {
-        let this = self.clone();
-        tokio::spawn(this.fetch_mon(name));
+    async fn cancelable_fetch(self, name: String , token: CancellationToken)
+    {
+        
+        // self.set_loading_state(LoadingState::Loading(name.clone(), token));
+        select! {
+            _= token.cancelled()=> {}
+            // pokemon = rustemon::pokemon::pokemon::get_by_name(name.as_str(), &rustemon_client)=>{
+            //     match pokemon {
+            //         Ok(pokemon) => {},
+            //         Err(_) => todo!(),
+            //     }
+            // }
+            _= self.fetch_mon(name)=>{}
+
+        }
+
     }
 
-    fn set_loading_state(&self, state: LoadingState) {
-        self.state.write().unwrap().loading_state = state;
+    pub fn set_mon(&self, name: PokemonName) {
+        let this = self.clone();
+        let cancellation_token = CancellationToken::new();
+        self.set_loading_state(LoadingState::Loading(name.clone(), cancellation_token.clone()));
+        tokio::spawn(this.cancelable_fetch(name,cancellation_token.clone()));
+    }
+
+    fn set_loading_state(&self, loading_state: LoadingState) {
+        let mut  state = self.state.write().unwrap();
+        match state.loading_state.clone() {
+            LoadingState::Loading(name, cancellation_token) => 
+            {
+                cancellation_token.cancel();
+                state.loading_state = loading_state;
+            },
+            _ => {state.loading_state = loading_state},
+        };
     }
 
     fn on_err(&self, err: Error) {
@@ -71,7 +98,7 @@ impl DetailsWidget {
     fn on_load(&self, mon: Pokemon) {
         let mut state = self.state.write().unwrap();
         match state.loading_state.clone() {
-            LoadingState::Loading(name) => {
+            LoadingState::Loading(name,_) => {
                 if name == mon.name {
                     self.abilities.set_abilities(mon.abilities.clone());
                     self.moves.set_moves(mon.moves.clone());

@@ -22,7 +22,7 @@ impl Widget for &DetailsWidget {
         let block = Block::bordered()
             .title(loading_state).border_style(if state.focused(){Style::default().fg(Color::Blue)} else {Style::default()});
         match state.loading_state().clone() {
-            LoadingState::Loading(name) => {
+            LoadingState::Loading(name,_) => {
                 Span::from(name.to_uppercase()).bold().render(block.inner(area), buf);
                 block.render(area, buf);
             }

@@ -1695,6 +1695,7 @@ dependencies = [
  "ratatui",
  "rustemon",
  "tokio",
+ "tokio-util",
  "tui-widget-list",
 ]
 
