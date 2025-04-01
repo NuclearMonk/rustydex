@@ -2,7 +2,8 @@ use std::{fmt, sync::{Arc, RwLock}};
 
 use ratatui::style::Style;
 use rustemon::{error::Error, model::{moves::Move, pokemon::PokemonMove}, Follow};
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::{select, sync::mpsc::UnboundedSender};
+use tokio_util::sync::CancellationToken;
 
 use crate::{events::{AppEvent, Event}, pokemon::get_client};
 
@@ -50,19 +51,32 @@ impl MoveWidget {
         }
     }
 
-    pub fn load(&self)
+    pub fn load(&self, cancellation_token: CancellationToken)
     {
         let state = self.state.read().unwrap();
         match state.loading_state.clone(){
-            LoadingState::Lazy(pokemon_move) => self.set_move(pokemon_move),
+            LoadingState::Lazy(pokemon_move) => {
+                let this = self.clone();
+                tokio::spawn(this.cancelable_fetch(pokemon_move, cancellation_token));
+            },
             _ => {}
         }
     }
 
-    pub fn set_move(&self, move_: PokemonMove) {
-        let this = self.clone();
-        tokio::spawn(this.fetch(move_));
+    async fn cancelable_fetch(self, move_ :PokemonMove , token: CancellationToken)
+    {
+        
+        // self.set_loading_state(LoadingState::Loading(name.clone(), token));
+        select! {
+            _= token.cancelled()=> {}
+            _= self.fetch(move_)=>{}
+
+        }
     }
+    // pub fn set_move(&self, move_: PokemonMove) {
+    //     let this = self.clone();
+    //     tokio::spawn(this.fetch(move_));
+    // }
 
     fn set_loading_state(&self, state: LoadingState) {
         self.state.write().unwrap().loading_state = state;

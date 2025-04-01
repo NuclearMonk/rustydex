@@ -6,7 +6,7 @@ use color_eyre::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // console_subscriber::init();
+    console_subscriber::init();
     color_eyre::install()?;
     let terminal = ratatui::init();
     let app_result = App::default().run(terminal).await;

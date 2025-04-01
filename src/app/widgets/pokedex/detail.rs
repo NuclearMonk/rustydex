@@ -60,12 +60,6 @@ impl DetailsWidget {
         // self.set_loading_state(LoadingState::Loading(name.clone(), token));
         select! {
             _= token.cancelled()=> {}
-            // pokemon = rustemon::pokemon::pokemon::get_by_name(name.as_str(), &rustemon_client)=>{
-            //     match pokemon {
-            //         Ok(pokemon) => {},
-            //         Err(_) => todo!(),
-            //     }
-            // }
             _= self.fetch_mon(name)=>{}
 
         }

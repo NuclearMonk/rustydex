@@ -5,6 +5,7 @@ use std::{
 
 use rustemon::model::pokemon::{PokemonAbility, PokemonMove};
 use tokio::sync::mpsc::UnboundedSender;
+use tokio_util::sync::CancellationToken;
 use tui_widget_list::ListState;
 
 use crate::events::{
@@ -33,13 +34,15 @@ impl MovesWidget {
         let start = state.list_state.selected.unwrap_or(0);
         let end = usize::min(start + 15, state.widgets.len());
         for ele in state.widgets[start..end].iter() {
-            ele.load();
+            ele.load(state.cancelation_token.child_token());
         }
     }
 
     pub fn set_moves(&self, moves: Vec<PokemonMove>) {
         {
             let mut state = self.state.write().unwrap();
+            state.cancelation_token.cancel();
+            state.cancelation_token = CancellationToken::new();
             state.widgets.clear();
             state.list_state = ListState::default();
             for move_ in moves {
@@ -56,6 +59,7 @@ impl MovesWidget {
 #[derive(Debug, Default)]
 pub struct MovesState {
     focused: bool,
+    cancelation_token : CancellationToken,
     pub widgets: Vec<MoveWidget>,
     pub list_state: ListState,
 }
