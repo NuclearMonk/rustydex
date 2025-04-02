@@ -10,7 +10,7 @@ pub type MoveName = String;
 pub fn get_client()-> RustemonClient
 {
     // RustemonClientBuilder::default()
-    // .with_mode(CacheMode::ForceCache)
+    // .with_mode(CacheMode::NoCache)
     // .with_manager(CACacheManager::default())
     // .with_options(CacheOptions {
     //     shared: true,

@@ -33,7 +33,6 @@ impl AbilitiesWidget {
             state.widgets.push(AbilityWidget::new(self.sender.clone(),ability));
         }
         state.list_state.select(Some(0));
-
     }
     
 
