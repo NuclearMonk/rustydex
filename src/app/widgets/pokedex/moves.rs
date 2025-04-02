@@ -121,7 +121,16 @@ impl MovesWidget {
         {
             None => {},
             Some(index) => {
-                self.fetch(state.moves[index].move_.name.clone());
+                match state.widgets_cache.get(&state.moves[index].move_.name) {
+                    None => {},
+                    Some(w) => {
+                        match w.loading_state() {
+                            super::monmove::LoadingState::Loading(pokemon_move) => self.fetch(state.moves[index].move_.name.clone()),
+                            super::monmove::LoadingState::Loaded(_) => {},
+                        }
+                    },
+                    
+                }
             }
         }
     }

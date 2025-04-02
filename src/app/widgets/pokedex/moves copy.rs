@@ -1,6 +1,5 @@
 use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
+    clone, collections::HashMap, sync::{Arc, RwLock}
 };
 
 use rustemon::{
@@ -30,30 +29,34 @@ pub struct MovesWidget {
 
 impl MovesWidget {
     pub fn new(sender: UnboundedSender<Event>) -> Self {
-        Self {
+        let mut  s = Self {
             sender,
             background_sender: None,
             state: Default::default(),
-        }
+        };
+        s.run();
+        s
     }
 
     fn start_fetch_worker(
         recv: UnboundedReceiver<MoveName>,
     ) -> UnboundedReceiver<Result<Move, Error>> {
         let (s, r) = unbounded_channel();
-        tokio::spawn(Self::fetch_thread(recv, s));
+        tokio::spawn(async move { Self::fetch_thread(recv, s).await});
         r
     }
 
-    pub fn run(&self){
+    pub fn run(&mut self){
+        let (background_sender, background_reciever) = unbounded_channel();
+        self.background_sender = Some(background_sender);
         let this = self.clone();
-        tokio::spawn( this.main_thread());
+        tokio::spawn( async move {this.main_thread(background_reciever).await});
     }
 
-    async fn main_thread(&self) {
-        let (background_sender, background_reciever) = unbounded_channel();
-        let main_receiver = Self::start_fetch_worker(background_reciever);
-        let mut stream = UnboundedReceiverStream::new(main_receiver);
+    async fn main_thread(&self,  background_receiver: UnboundedReceiver<String>) {
+        let background_sender = self.background_sender.clone().unwrap();
+        let main_receiver = Self::start_fetch_worker(background_receiver);
+        let mut stream = UnboundedReceiverStream::new(main_receiver).fuse();
         loop {
             tokio::select! {
                     _ = background_sender.closed() => {
@@ -97,35 +100,57 @@ impl MovesWidget {
 
     pub fn set_moves(&self, moves: Vec<PokemonMove>) {
         let mut state = self.state.write().unwrap();
-        state.widgets.clear();
-        for move_ in moves {
+        state.moves = moves.clone();
+        for (i, move_) in moves.iter().enumerate() {
             let name = move_.move_.name.to_string();
             state
-                .widgets
-                .insert(name.clone(),  MoveWidget::new(move_));
-            self.fetch(name)
+                .widgets_cache
+                .insert(name.clone(),  MoveWidget::new(move_.clone()));
+            if i <= 20
+            {
+                self.fetch(name)
+            }
+        }
+        state.list_state.select(Some(0));
+    }
+
+    fn load(&self)
+    {
+        let state = self.state.read().unwrap();
+        match state.list_state.selected
+        {
+            None => {},
+            Some(index) => {
+                self.fetch(state.moves[index].move_.name.clone());
+            }
         }
     }
 
     fn load_move(&self, move_: Move) {
         let mut state = self.state.write().unwrap();
-        match state.widgets.get_mut(&move_.name) {
+        match state.widgets_cache.get_mut(&move_.name) {
             Some(widget) => widget.set_move(move_),
             None => {}
         }
+        let _ = self.sender.send(Event::App(AppEvent::Redraw));
     }
 }
 
 #[derive(Debug, Default)]
 pub struct MovesState {
     focused: bool,
-    pub widgets: HashMap<String, MoveWidget>,
+    moves : Vec<PokemonMove>,
+    pub widgets_cache: HashMap<String, MoveWidget>,
     pub list_state: ListState,
 }
 
 impl MovesState {
     pub fn focused(&self) -> bool {
         self.focused
+    }
+    
+    pub fn moves(&self) -> &[PokemonMove] {
+        &self.moves
     }
 }
 
@@ -134,12 +159,12 @@ impl Navigation for &MovesWidget {
         let consumed = match direction {
             NavDirection::Up => {
                 self.state.write().unwrap().list_state.previous();
-                // self.load();
+                self.load();
                 true
             }
             NavDirection::Down => {
                 self.state.write().unwrap().list_state.next();
-                // self.load();
+                self.load();
                 true
             }
             _ => false,
